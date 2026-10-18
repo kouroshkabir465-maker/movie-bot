@@ -1,0 +1,35 @@
+name: Daily movies 20:00 Istanbul
+on:
+  schedule:
+    - cron: '0 17 * * *'   # backup; worker cron triggers on time; bot skips if sent <2h ago
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: { group: movie-state, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: Europe/Istanbul
+      MOVIE_TELEGRAM_BOT_TOKEN: ${{ secrets.MOVIE_TELEGRAM_BOT_TOKEN }}
+      MOVIE_CHAT_IDS: ${{ secrets.MOVIE_CHAT_IDS }}
+      TG_CHAT: ${{ github.event.client_payload.chat }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12', cache: pip }
+      - run: pip install -q -r requirements.txt
+      - name: Pull state
+        run: git fetch -q origin state && git show origin/state:seen.json > seen.json || true
+      - run: python movie_bot.py --daily
+      - name: Push state
+        if: always()
+        run: |
+          [ -f seen.json ] || exit 0
+          cp seen.json /tmp/seen.json
+          git config user.name movie-bot; git config user.email movie-bot@users.noreply.github.com
+          if git fetch -q origin state; then git checkout -q -B st origin/state; else git checkout -q --orphan st; git rm -rqf .; fi
+          cp /tmp/seen.json seen.json; git add seen.json
+          git diff --cached --quiet || { git commit -qm "state $(date -u +%FT%TZ)"; git push -q origin HEAD:state; }

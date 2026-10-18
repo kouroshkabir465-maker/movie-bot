@@ -1,0 +1,22 @@
+name: Welcome message
+on:
+  workflow_dispatch:
+    inputs:
+      chat: { description: "chat id (empty = all)", default: "" }
+permissions: {}
+jobs:
+  w:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: Europe/Istanbul
+      MOVIE_TELEGRAM_BOT_TOKEN: ${{ secrets.MOVIE_TELEGRAM_BOT_TOKEN }}
+      MOVIE_CHAT_IDS: ${{ secrets.MOVIE_CHAT_IDS }}
+      TG_CHAT: ${{ inputs.chat }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12', cache: pip }
+      - run: pip install -q -r requirements.txt
+      - run: python movie_bot.py --welcome
